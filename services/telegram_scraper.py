@@ -1,17 +1,12 @@
 from telethon import TelegramClient
 import socks
 from datetime import datetime
-from zoneinfo import ZoneInfo
-import asyncio
 from config import settings
-
-from telegram_message import TelegramMessage
+from schemas.telegram_message import TelegramMessage
 from telethon_msg_to_model import telethon_msg_to_model
-
 
 API_ID = settings.telegram_api_id
 API_HASH = settings.telegram_api_hash
-CHANNELS = settings.telegram_channels
 
 client = TelegramClient(
     "session_name",
@@ -22,8 +17,9 @@ client = TelegramClient(
     retry_delay=3,
 )
 
-
-async def fetch_channel_messages(channel_username: str, from_date: datetime) -> list[TelegramMessage]:
+async def fetch_channel_messages(
+    channel_username: str, from_date: datetime
+) -> list[TelegramMessage]:
     """Fetch today's messages from a single channel."""
     try:
         channel = await client.get_entity(channel_username)
@@ -44,24 +40,5 @@ async def fetch_channel_messages(channel_username: str, from_date: datetime) -> 
     return messages
 
 
-async def extract_messages(from_date: datetime):
-    """Fetch messages from all channels concurrently."""
-    print("Connecting to Telegram...")
-
-    # Fetch all channels concurrently
-    tasks = [fetch_channel_messages(ch) for ch in CHANNELS]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    # Flatten results and filter out errors
-    all_messages = []
-    for result in results:
-        if isinstance(result, list):
-            all_messages.extend(result)
-        else:
-            print(f"Task failed: {result}")
-
-    if all_messages:
-        print(f"\nTotal messages: {len(all_messages)}")
-        # print(all_messages[0])
-
-    return all_messages
+async def scrape_channel(channel_id, date_from):
+    return await fetch_channel_messages(channel_id, date_from)
