@@ -4,7 +4,7 @@ from db.engine import get_session
 from db.repos.users import get_users
 from db.repos.messages import get_messages
 from db.repos.evaluations import batch_save_evaluations
-from services.scoring_service import evaluate_batch
+from services.scoring_service import evaluate_messages
 
 
 async def run_evaluate_job():
@@ -22,4 +22,5 @@ async def run_evaluate_job():
         batch_save_evaluations(flat, session, on_conflict="nothing")
 
 async def evaluate_for_user(user, messages):
-    return await evaluate_batch(user=user, messages=messages)
+
+    return await evaluate_messages(user=user, messages=messages)

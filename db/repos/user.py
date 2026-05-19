@@ -1,3 +1,9 @@
+from schemas.user import UserDto
+from typing import List
+from sqlalchemy.orm import  Session
+
+
+
 def batch_save_users(
     users: List[UserDto],
     session: Session,

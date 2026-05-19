@@ -1,10 +1,9 @@
 from db.models.telegram import TelegramMessageRow
 from sqlalchemy.orm import  Session
-from telegram_message import TelegramMessage
 from typing import Optional, List
 from datetime import datetime
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from telegram_message import MessageEntity,MediaInfo,Engagement,ForwardInfo
+from schemas.telegram_message import MessageEntity,MediaInfo,Engagement,ForwardInfo,TelegramMessage
 
 
 
@@ -59,7 +58,8 @@ def get_messages(
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
     has_text: Optional[bool] = None,
-    limit: Optional[int] = None
+    limit: Optional[int] = None,
+    order_by_date_desc: bool = False
 ) -> List[TelegramMessage]:
     """
     Get messages with optional filters.
@@ -73,6 +73,7 @@ def get_messages(
         date_to: Messages before this date
         has_text: True (only with text), False (only without text), None (all)
         limit: Maximum number of results
+        order_by_date_desc: Order by date descending (newest first)
     
     Returns:
         List of TelegramMessage objects
@@ -80,6 +81,7 @@ def get_messages(
     Examples:
         get_messages(session, channel_id=123)
         get_messages(session, date_from=datetime(2025, 1, 1), has_text=True)
+        get_messages(session, channel_id=123, order_by_date_desc=True)
     """
     query = session.query(TelegramMessageRow)
     
@@ -103,11 +105,15 @@ def get_messages(
     elif has_text is False:
         query = query.filter(TelegramMessageRow.text.is_(None))
     
+    if order_by_date_desc:
+        query = query.order_by(TelegramMessageRow.date.desc())
+    
     if limit is not None:
         query = query.limit(limit)
     
     rows = query.all()
     return [_from_row(row) for row in rows]
+
 
     
 def _to_row(msg: TelegramMessage) -> dict:

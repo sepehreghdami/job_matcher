@@ -3,7 +3,7 @@ from telethon.tl.types import (
     MessageMediaPhoto,
     MessageMediaDocument,
 )
-from telegram_message import (
+from schemas.telegram_message import (
     TelegramMessage,
     MessageEntity,
     MediaInfo,
@@ -11,7 +11,6 @@ from telegram_message import (
     Engagement,
     ForwardInfo,
 )
-from telethon.types import TypeAccountDaysTTL
 
 
 def telethon_msg_to_model(msg) -> TelegramMessage:

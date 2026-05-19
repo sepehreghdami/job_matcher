@@ -11,13 +11,12 @@ from sqlalchemy import (
     func
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session
-from telegram_message import TelegramMessage
 from sqlalchemy.exc import OperationalError
 from typing import Optional, List
 from datetime import datetime
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from urllib.parse import urlparse
-from telegram_message import MessageEntity,MediaInfo,Engagement,ForwardInfo
+from schemas.telegram_message import MessageEntity,MediaInfo,Engagement,ForwardInfo,TelegramMessage
 
 
 class Base(DeclarativeBase):
