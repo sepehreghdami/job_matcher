@@ -32,9 +32,10 @@ def batch_save_evaluations(
     """
     if not evaluations:
         return 0
-    
+
     eval_dicts = [e.model_dump(exclude={"id", "created_at"}, exclude_none=True) for e in evaluations]
-    
+
+
     stmt = pg_insert(MessageEvaluation).values(eval_dicts)
     
     if on_conflict == "update":

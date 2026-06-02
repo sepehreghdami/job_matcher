@@ -12,7 +12,6 @@ async def run_evaluate_job():
         users = get_users(session, is_active=True)
         # only messages not yet evaluated — see note below
         messages = get_messages(session, has_text=True)
-        print(messages[0]) #TODO: should be removed
     # one coroutine per user — concurrent LLM calls
         tasks = [evaluate_for_user(user, messages) for user in users]
         await asyncio.gather(*tasks)

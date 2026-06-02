@@ -35,22 +35,16 @@ class ForwardInfo(BaseModel):
     channel_id: Optional[int] = None
     date: Optional[datetime] = None
 
-
 class TelegramMessage(BaseModel):
-    id: int
+    pk: Optional[int] = None   
+    id: int                    
     channel_id: int
-
     date: datetime
     edit_date: Optional[datetime] = None
-
     text: Optional[str] = None
     entities: List[MessageEntity] = []
-
     media: Optional[MediaInfo] = None
-
     engagement: Optional[Engagement] = None
-
     post_author: Optional[str] = None
     grouped_id: Optional[int] = None
-
     forward: Optional[ForwardInfo] = None

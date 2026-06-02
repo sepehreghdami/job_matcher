@@ -37,6 +37,7 @@ def batch_save_messages(
 
 def _from_row(row: TelegramMessageRow) -> TelegramMessage:
     return TelegramMessage(
+        pk=row.pk,            
         id=row.message_id,
         channel_id=row.channel_id,
         date=row.date,

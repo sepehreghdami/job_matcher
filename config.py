@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     # forward_interval_minutes:int
     scoring_batch_size:int
     scoring_max_concurrent:int
+    scoring_model:str
 
     model_config = {
         "env_file": ".env",
