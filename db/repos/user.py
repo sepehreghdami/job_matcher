@@ -1,6 +1,8 @@
 from schemas.user import UserDto
-from typing import List
 from sqlalchemy.orm import  Session
+from typing import Optional, List
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from db.models.user import User
 
 
 
@@ -32,7 +34,7 @@ def batch_save_users(
     
     user_dicts = [u.model_dump(exclude={"created_at"}, exclude_none=True) for u in users]
     
-    stmt = pg_insert(User).values(user_dicts)
+    stmt = pg_insert(UserDto).values(user_dicts)
     
     if on_conflict == "update":
         stmt = stmt.on_conflict_do_update(

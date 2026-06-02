@@ -7,11 +7,19 @@ class Settings(BaseSettings):
     telegram_phone: str
     database_url: str
     telegram_channels: List[str]
+    fetch_interval_minutes:int
+    evaluate_interval_minutes:int
+    # forward_interval_minutes:int
+    scoring_batch_size:int
+    scoring_max_concurrent:int
 
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
     }
+    openai_api_key: str
+
+
 
 
 settings = Settings()

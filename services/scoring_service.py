@@ -2,6 +2,7 @@
 
 import asyncio
 from typing import List
+from openai import api_key
 from pydantic import BaseModel
 from agents import Agent, Runner
 from schemas.telegram_message import TelegramMessage
@@ -58,7 +59,7 @@ Rules you must follow:
 
 def _build_user_prompt(resume: str, messages: List[TelegramMessage]) -> str:
     postings = "\n\n".join(
-        f"message_pk: {msg.pk}\n{(msg.text or '').strip()[:500]}"
+        f"message_pk: {msg.id}\n{(msg.text or '').strip()[:500]}"
         for msg in messages
     )
     return f"""
@@ -77,8 +78,10 @@ JOB POSTINGS:
 
 _agent = Agent(
     name="job_opportunity_evaluator",
+    model="gpt-5.4-mini", #TODO(to be moved to config.py)
     instructions=INSTRUCTIONS,
     output_type=ScoringResult,   # forces structured output, no JSON parsing needed
+    
 )
 
 
@@ -99,7 +102,7 @@ async def _score_batch(
     now = datetime.now(timezone.utc)
 
     # build a quick lookup so we can validate the LLM echoed all pks back
-    sent_pks = {msg.pk for msg in batch}
+    sent_pks = {msg.id for msg in batch}
     returned_pks = {s.message_pk for s in scored.scores}
     missing = sent_pks - returned_pks
 
@@ -134,7 +137,7 @@ async def evaluate_messages(
     if not messages or not user.resume_text:
         return []
 
-    batch_size = settings.SCORING_BATCH_SIZE  # default 10
+    batch_size = settings.scoring_batch_size  # default 10
 
     # slice into batches
     batches = [
@@ -145,7 +148,7 @@ async def evaluate_messages(
     # Opinion: don't fire 30 concurrent OpenAI calls blindly —
     # you'll hit rate limits fast. A semaphore lets you tune concurrency
     # without changing the gather pattern.
-    sem = asyncio.Semaphore(settings.SCORING_MAX_CONCURRENT)  # e.g. 5
+    sem = asyncio.Semaphore(settings.scoring_max_concurrent)  # e.g. 5
 
     async def _guarded(batch):
         async with sem:

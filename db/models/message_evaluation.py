@@ -8,15 +8,11 @@ from sqlalchemy import (
     UniqueConstraint,
     func
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from typing import Optional, List
+from sqlalchemy.orm import Mapped, mapped_column
+from typing import Optional
 from datetime import datetime
-from schemas.evaluation import EvaluationDto
+from db.base import Base
 
-
-class Base(DeclarativeBase):
-    pass
 
 class MessageEvaluation(Base):
     """

@@ -1,56 +1,23 @@
-# from extract_todays_messages import client, extract_messages
-# from db.telegram import create_db, batch_save_messages
-# from sqlalchemy.orm import sessionmaker
-# import asyncio
-# from config import settings
-
+from db.engine import engine  
+from jobs.score_messages import run_evaluate_job 
 import asyncio
-import datetime
-from db.engine import get_session
-from db.repos.messages import get_messages, batch_save_messages
-from services.telegram_scraper import scrape_channel
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from config import settings
-from services.telegram_scraper import start,stop
-
-DATABASE_URL = settings.database_url
-
-
-# engine = create_db(DATABASE_URL)  
-# SessionLocal = sessionmaker(bind=engine)
 
 async def main():
-    with get_session() as session:
-        latest = get_messages(session, limit=1, order_by_date_desc=True)
-        date_from = latest[0].date if latest else datetime.now().replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
+    scheduler = AsyncIOScheduler()
 
-    print(f"messgas last time fetched:{date_from}")
+    # print(settings.fetch_interval_minutes)
+    # scheduler.add_job(run_fetch_job,"interval", minutes=settings.fetch_interval_minutes)
+    scheduler.add_job(run_evaluate_job, "interval", minutes=settings.evaluate_interval_minutes)
+    # scheduler.add_job(run_forward_job,  "interval", minutes=settings.forward_interval_minutes)
+    # scheduler.start()
 
-    await start()
-    try:
-        tasks = [
-            scrape_channel(ch, date_from)
-            for ch in settings.telegram_channels
-        ]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-    finally:
-        await stop()
+    # run once on startup too
+    # await asyncio.gather(run_fetch_job(), run_evaluate_job(), run_forward_job())
+    await asyncio.gather(run_evaluate_job())
 
-    messages = []
-    for ch, result in zip(settings.telegram_channels, results):
-        if isinstance(result, Exception):
-            print(f"[fetch_job] {ch} failed: {result}")
-        else:
-            messages.extend(result)
-
-    with get_session() as session:
-        inserted = batch_save_messages(messages, session)
-
-    print(f"[fetch_job] inserted {inserted} new messages")
-
-
+    await asyncio.Event().wait()  # keep alive
 
 if __name__ == "__main__":
     asyncio.run(main())
-
