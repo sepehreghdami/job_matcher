@@ -9,7 +9,13 @@ from schemas.user import UserDto
 from schemas.evaluation import EvaluationDto
 from datetime import datetime, timezone
 from config import settings
+from dotenv import load_dotenv
+import agents
 
+
+agents.set_tracing_disabled(True)
+
+load_dotenv()
 
 class MessageScore(BaseModel):
     message_pk: int
@@ -111,6 +117,7 @@ async def _score_batch(
             message_pk=real_pk,                       # ← real DB pk, not Telegram id
             user_id=user.user_id,
             score=s.score,
+            reason=s.reason,
             processed_at=now,
         ))
 
@@ -141,5 +148,4 @@ async def evaluate_messages(
             print(f"[scoring] user={user.user_id} batch={i} failed: {res}")
         else:
             flat.extend(res)
-
     return flat

@@ -1,9 +1,12 @@
 from db.models.telegram import TelegramMessageRow
+from db.models.message_evaluation import MessageEvaluation
 from sqlalchemy.orm import  Session
 from typing import Optional, List
 from datetime import datetime
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from schemas.telegram_message import MessageEntity,MediaInfo,Engagement,ForwardInfo,TelegramMessage
+from sqlalchemy import select
+
 
 
 
@@ -53,7 +56,7 @@ def _from_row(row: TelegramMessageRow) -> TelegramMessage:
 
 def get_messages(
     session: Session,
-    pk: Optional[int] = None,
+    pks: Optional[List[int]] = None,
     message_id: Optional[int] = None,
     channel_id: Optional[int] = None,
     date_from: Optional[datetime] = None,
@@ -86,8 +89,8 @@ def get_messages(
     """
     query = session.query(TelegramMessageRow)
     
-    if pk is not None:
-        query = query.filter(TelegramMessageRow.pk == pk)
+    if pks is not None:
+        query = query.filter(TelegramMessageRow.pk.in_(pks))
     
     if message_id is not None:
         query = query.filter(TelegramMessageRow.message_id == message_id)
@@ -131,3 +134,20 @@ def _to_row(msg: TelegramMessage) -> dict:
         "engagement": msg.engagement.model_dump(mode="json") if msg.engagement else None,
         "forward": msg.forward.model_dump(mode="json") if msg.forward else None,
     }
+
+
+
+def get_unevaluated_messages(session: Session, user_id: int) -> list[TelegramMessageRow]:
+    evaluated = (
+        select(MessageEvaluation.message_pk)
+        .where(MessageEvaluation.user_id == user_id)
+        .subquery()
+    )
+
+    stmt = (
+        select(TelegramMessageRow)
+        .outerjoin(evaluated, TelegramMessageRow.pk == evaluated.c.message_pk)
+        .where(evaluated.c.message_pk == None) 
+    )
+
+    return session.scalars(stmt).all()

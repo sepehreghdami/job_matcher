@@ -5,16 +5,12 @@ from sqlalchemy import (
     String,
     Text,
     JSON,
-    create_engine,
     UniqueConstraint,
-    text,
     func
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import  Mapped, mapped_column
 from typing import Optional
 from datetime import datetime
-from urllib.parse import urlparse
 from db.base import Base
 
 

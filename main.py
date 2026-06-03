@@ -1,22 +1,30 @@
 from db.engine import engine  
 from jobs.score_messages import run_evaluate_job 
 from jobs.fetch_messages import run_fetch_job
+from jobs.forward_matches import run_forward_job
 import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from config import settings
+from services.bot_handler import build_bot_app 
+
 
 async def main():
+    bot_app = build_bot_app()
+    await bot_app.initialize()
+    await bot_app.start()
+    await bot_app.updater.start_polling()
+
     scheduler = AsyncIOScheduler()
 
     # print(settings.fetch_interval_minutes)
     # scheduler.add_job(run_fetch_job,"interval", minutes=settings.fetch_interval_minutes)
-    scheduler.add_job(run_evaluate_job, "interval", minutes=settings.evaluate_interval_minutes)
-    # scheduler.add_job(run_forward_job,  "interval", minutes=settings.forward_interval_minutes)
+    # scheduler.add_job(run_evaluate_job, "interval", minutes=settings.evaluate_interval_minutes)
+    scheduler.add_job(run_forward_job,  "interval", minutes=settings.forward_interval_minutes)
     scheduler.start()
 
     # run once on startup too
     # await asyncio.gather(run_fetch_job(), run_evaluate_job(), run_forward_job())
-    await asyncio.gather(run_evaluate_job())
+    await asyncio.gather(run_forward_job()) #TODO: SHOULD BE REMOVED
 
     await asyncio.Event().wait()  # keep alive
 
