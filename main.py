@@ -17,14 +17,14 @@ async def main():
     scheduler = AsyncIOScheduler()
 
     # print(settings.fetch_interval_minutes)
-    # scheduler.add_job(run_fetch_job,"interval", minutes=settings.fetch_interval_minutes)
+    scheduler.add_job(run_fetch_job,"interval", minutes=settings.fetch_interval_minutes)
     # scheduler.add_job(run_evaluate_job, "interval", minutes=settings.evaluate_interval_minutes)
-    scheduler.add_job(run_forward_job,  "interval", minutes=settings.forward_interval_minutes)
+    # scheduler.add_job(run_forward_job,  "interval", minutes=settings.forward_interval_minutes)
     scheduler.start()
 
     # run once on startup too
     # await asyncio.gather(run_fetch_job(), run_evaluate_job(), run_forward_job())
-    await asyncio.gather(run_forward_job()) #TODO: SHOULD BE REMOVED
+    await asyncio.gather(run_fetch_job()) #TODO: SHOULD BE REMOVED
 
     await asyncio.Event().wait()  # keep alive
 

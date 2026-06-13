@@ -48,3 +48,4 @@ class TelegramMessage(BaseModel):
     post_author: Optional[str] = None
     grouped_id: Optional[int] = None
     forward: Optional[ForwardInfo] = None
+    channel_username: Optional[str] = None

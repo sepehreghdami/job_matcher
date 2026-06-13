@@ -133,6 +133,7 @@ def _to_row(msg: TelegramMessage) -> dict:
         "media": msg.media.model_dump(mode="json") if msg.media else None,
         "engagement": msg.engagement.model_dump(mode="json") if msg.engagement else None,
         "forward": msg.forward.model_dump(mode="json") if msg.forward else None,
+        "channel_username": msg.channel_username,
     }
 
 

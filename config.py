@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     }
     openai_api_key: str
 
+    forward_max_concurrent: int
+
 
 
 

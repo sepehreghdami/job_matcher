@@ -22,6 +22,7 @@ class TelegramMessageRow(Base):
     )
 
     pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    channel_username: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     message_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     channel_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)

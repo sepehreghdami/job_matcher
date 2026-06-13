@@ -32,43 +32,50 @@ async def run_forward_job():
 
     message_map = {m.pk: m for m in messages}
     user_map    = {u.user_id: u for u in users}
-
+    print(f"[forward] processing {len(pending)} evaluations")
+    semaphore = asyncio.Semaphore(settings.forward_max_concurrent)
     tasks = [
-        _forward_single(evaluation, message_map, user_map)
+        _forward_single(evaluation, message_map, user_map, semaphore)
         for evaluation in pending
     ]
     await asyncio.gather(*tasks)
 
 
-async def _forward_single(evaluation: EvaluationDto, message_map: dict, user_map: dict):
-    message = message_map.get(evaluation.message_pk)
-    user    = user_map.get(evaluation.user_id)
+async def _forward_single(
+    evaluation: EvaluationDto,
+    message_map: dict,
+    user_map: dict,
+    semaphore: asyncio.Semaphore,
+):
+    async with semaphore:
+        message = message_map.get(evaluation.message_pk)
+        user = user_map.get(evaluation.user_id)
 
-    if not message:
-        print(f"[forward] message pk={evaluation.message_pk} not found, skipping")
-        return
+        if not message:
+            print(f"[forward] message pk={evaluation.message_pk} not found, skipping")
+            return
 
-    if not user or not user.telegram_username:
-        print(f"[forward] user id={evaluation.user_id} has no telegram_username, skipping")
-        return
+        if not user or not user.telegram_username:
+            print(f"[forward] user id={evaluation.user_id} has no telegram_username, skipping")
+            return
 
-    success = await forward_message(
-        evaluation=evaluation,
-        message=message,
-        user=user
-    )
+        success = await forward_message(
+            evaluation=evaluation,
+            message=message,
+            user=user,
+        )
 
-    if success:
-        with get_session() as session:
-            batch_save_evaluations(
-                [EvaluationDto(
-                    id=evaluation.id,
-                    message_pk=evaluation.message_pk,
-                    user_id=evaluation.user_id,
-                    score=evaluation.score,
-                    processed_at=evaluation.processed_at,
-                    forwarded_at=datetime.now(timezone.utc),  # stamp it
-                )],
-                session,
-                on_conflict="update",   # update forwarded_at
-            )
+        if success == "ok":
+            with get_session() as session:
+                batch_save_evaluations(
+                    [EvaluationDto(
+                        id=evaluation.id,
+                        message_pk=evaluation.message_pk,
+                        user_id=evaluation.user_id,
+                        score=evaluation.score,
+                        processed_at=evaluation.processed_at,
+                        forwarded_at=datetime.now(timezone.utc),
+                    )],
+                    session,
+                    on_conflict="update",
+                )
