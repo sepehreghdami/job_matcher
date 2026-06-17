@@ -20,5 +20,6 @@ async def evaluate_for_user(user, messages, batch_size: int = 100):
     for i in range(0, len(messages), batch_size):
         batch = messages[i : i + batch_size]
         evals = await evaluate_messages(user=user, messages=batch)
+        print(f"evals:{evals}")
         with get_session() as session:
             batch_save_evaluations(evals, session, on_conflict="nothing")

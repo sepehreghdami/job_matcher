@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from config import settings
 from dotenv import load_dotenv
 import agents
+from openai import AsyncOpenAI
+from agents import Agent, Runner, set_default_openai_client
 
 
 agents.set_tracing_disabled(True)
@@ -79,6 +81,13 @@ JOB POSTINGS:
     return prompt, index_to_pk
 
 
+client = AsyncOpenAI(
+    api_key=settings.llm_api_key,
+    base_url=settings.llm_base_url,
+)
+
+set_default_openai_client(client)
+
 _agent = Agent(
     name="job_opportunity_evaluator",
     model=settings.scoring_model,
@@ -97,7 +106,6 @@ async def _score_batch(
     scored: ScoringResult = result.final_output
 
     now = datetime.now(timezone.utc)
-
     sent_indices = set(index_to_pk.keys())           # {1, 2, 3, ...}
     returned_indices = {s.message_pk for s in scored.scores}
     missing = sent_indices - returned_indices
