@@ -52,6 +52,7 @@ def _from_row(row: TelegramMessageRow) -> TelegramMessage:
         post_author=row.post_author,
         grouped_id=row.grouped_id,
         forward=ForwardInfo(**row.forward) if row.forward else None,
+        channel_username=row.channel_username,
     )
 
 def get_messages(
@@ -138,7 +139,7 @@ def _to_row(msg: TelegramMessage) -> dict:
 
 
 
-def get_unevaluated_messages(session: Session, user_id: int) -> list[TelegramMessageRow]:
+def get_unevaluated_messages(session: Session, user_id: int) -> list[TelegramMessage]:
     evaluated = (
         select(MessageEvaluation.message_pk)
         .where(MessageEvaluation.user_id == user_id)
@@ -151,4 +152,5 @@ def get_unevaluated_messages(session: Session, user_id: int) -> list[TelegramMes
         .where(evaluated.c.message_pk == None) 
     )
 
-    return session.scalars(stmt).all()
+    rows = session.scalars(stmt).all()
+    return [_from_row(row) for row in rows]

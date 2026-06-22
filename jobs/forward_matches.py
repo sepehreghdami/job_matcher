@@ -66,16 +66,20 @@ async def _forward_single(
         )
 
         if success == "ok":
+            now = datetime.now(timezone.utc)
             with get_session() as session:
                 batch_save_evaluations(
-                    [EvaluationDto(
-                        id=evaluation.id,
-                        message_pk=evaluation.message_pk,
-                        user_id=evaluation.user_id,
-                        score=evaluation.score,
-                        processed_at=evaluation.processed_at,
-                        forwarded_at=datetime.now(timezone.utc),
-                    )],
+                    [evaluation.model_copy(update={"forwarded_at": now})],
                     session,
                     on_conflict="update",
                 )
+        elif success == "permanent_failure":
+            now = datetime.now(timezone.utc)
+            with get_session() as session:
+                batch_save_evaluations(
+                    [evaluation.model_copy(update={"forwarded_at": now})],
+                    session,
+                    on_conflict="update",
+                )
+        else:
+            print(f"[forward] transient failure for eval id={evaluation.id}, will retry")

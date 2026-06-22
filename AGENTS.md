@@ -1,67 +1,56 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
+## Project Overview
 
-This is a Python job-matching service that fetches Telegram job posts, scores them against user resumes, and stores evaluations in PostgreSQL.
+Python async service that scrapes Telegram channels for job posts, scores them against user resumes via LLM, and forwards matches to users via a Telegram bot. PostgreSQL for storage, APScheduler for scheduling.
 
-- `main.py` starts the async scheduler and job runners.
-- `config.py` loads required settings from `.env` via Pydantic settings.
-- `jobs/` contains scheduled workflows such as fetching, scoring, and forwarding.
-- `services/` contains external-service logic for Telegram, OpenAI scoring, and forwarding.
-- `db/` contains SQLAlchemy engine setup, models, and repository helpers.
-- `schemas/` contains DTO-style Pydantic models used between layers.
-- `post_test.py` is an ad hoc WordPress posting script, not a formal test suite.
+## Key Architecture Facts
 
-Keep virtual environments, session files, caches, and local credentials out of source control. Current ignored examples include `scraper_env/`, `__pycache__/`, `.env`, and `session_name.session`.
+- **Two Telegram client libraries in use**: Telethon (`services/telegram_scraper.py`) scrapes channels; `python-telegram-bot` (`services/bot_handler.py`, `services/forwarding_service.py`) handles bot commands and message forwarding. Don't confuse their APIs.
+- **Lazy-initialized singletons**: DB engine (`db/engine.py`), Telethon client (`services/telegram_scraper.py`), Bot instance (`services/forwarding_service.py`), and OpenAI client (`services/scoring_service.py`) all use `_var = None` + getter pattern. Nothing connects at import time — first call to `get_session()`, `_get_client()`, `_get_bot()`, or `_ensure_initialized()` triggers initialization.
+- **DB auto-creates**: `build_engine()` creates the database if missing and runs `Base.metadata.create_all()` on every startup. No migration tool is configured.
+- **Scoring uses OpenAI Agents SDK** (`agents` package), not raw OpenAI API. Structured output via Pydantic model `ScoringResult`. LLM is configured via `llm_api_key`/`llm_base_url` env vars (supports non-OpenAI endpoints). Scoring prompt is in `services/scoring_constants.py`.
+- **`telethon_msg_to_model.py`** at repo root converts raw Telethon `Message` objects to Pydantic `TelegramMessage`. Used only by the scraper.
+- **`main.py`** starts both a Telegram bot (polling) and APScheduler concurrently. All three jobs (fetch, evaluate, forward) run once on startup, then on intervals.
 
-## Build, Test, and Development Commands
-
-Create and activate a local virtual environment before running the project:
+## Commands
 
 ```powershell
+# Setup
 python -m venv scraper_env
 .\scraper_env\Scripts\Activate.ps1
 pip install -r requirements.txt
-```
 
-Run the scheduler locally:
-
-```powershell
+# Run the full service (bot + scheduler)
 python main.py
 ```
 
-Run individual scripts only when their required `.env` values and external credentials are configured:
+No test suite, linter, or formatter is configured. No build step.
 
-```powershell
-python post_test.py
-```
+## Required Environment Variables
 
-There is no dedicated build step. Database tables are created on startup through `db.engine.build_engine()`.
+All loaded from `.env` via pydantic-settings (`config.py`):
 
-## Coding Style & Naming Conventions
+| Variable | Purpose |
+|---|---|
+| `telegram_api_id`, `telegram_api_hash`, `telegram_phone` | Telethon user-session auth |
+| `telegram_bot_token` | python-telegram-bot bot token |
+| `database_url` | PostgreSQL connection string |
+| `telegram_channels` | Comma-separated list of channel usernames to scrape |
+| `llm_api_key`, `llm_base_url` | OpenAI-compatible LLM endpoint |
+| `scoring_model` | Model name for the scoring agent |
+| `fetch_interval_minutes`, `evaluate_interval_minutes`, `forward_interval_minutes` | Scheduler intervals |
+| `scoring_batch_size`, `scoring_max_concurrent` | Scoring concurrency controls |
+| `forward_score_threshold`, `forward_max_concurrent` | Forwarding thresholds |
 
-Use standard Python style with 4-space indentation. Name modules and files in `snake_case.py`, functions in `snake_case`, classes and Pydantic models in `PascalCase`, and constants in `UPPER_SNAKE_CASE`.
+## Coding Conventions
 
-Keep business flow in `jobs/`, external integrations in `services/`, persistence in `db/repos/`, and database table definitions in `db/models/`. Prefer typed function signatures and Pydantic schemas when data crosses module boundaries.
+- 4-space indentation, standard Python style.
+- `snake_case` for files/functions, `PascalCase` for classes/Pydantic models, `UPPER_SNAKE_CASE` for constants.
+- Business logic in `jobs/`, external integrations in `services/`, persistence in `db/repos/`, table definitions in `db/models/`.
+- Pydantic schemas in `schemas/` for cross-module data transfer.
+- Typed function signatures preferred.
 
-## Testing Guidelines
+## Security
 
-No formal test framework is currently configured. When adding tests, use `pytest`, place tests under `tests/`, and name files `test_<module>.py`. Focus coverage on repository behavior, scoring prompt construction, batching, and scheduler job orchestration.
-
-Recommended command after adding tests:
-
-```powershell
-pytest
-```
-
-Avoid tests that call Telegram, OpenAI, WordPress, or PostgreSQL directly unless explicitly marked as integration tests and configured with safe test credentials.
-
-## Commit & Pull Request Guidelines
-
-Recent history uses placeholder messages such as `dirty commit`; future commits should be more descriptive. Use short imperative subjects, for example `Add scoring batch retry handling` or `Refactor Telegram message repository`.
-
-Pull requests should include a concise summary, configuration changes, database or schema impacts, and test results. Include screenshots only for user-visible UI changes. Never include real `.env` values, Telegram session files, API keys, or application passwords in commits or PR descriptions.
-
-## Security & Configuration Tips
-
-Treat `.env`, `session_name.session`, API keys, database URLs, Telegram credentials, and WordPress app passwords as secrets. Rotate any credential that was committed or shared. Document required environment variable names, but not their values.
+Never commit: `.env`, `session_name.session` (Telethon session), API keys, database URLs. These are in `.gitignore`.

@@ -5,10 +5,15 @@ from schemas.evaluation import EvaluationDto
 from schemas.telegram_message import TelegramMessage
 from schemas.user import UserDto
 from config import settings
-from telegram.request import HTTPXRequest
+
+_bot = None
 
 
-_bot = Bot(token=settings.telegram_bot_token)
+def _get_bot() -> Bot:
+    global _bot
+    if _bot is None:
+        _bot = Bot(token=settings.telegram_bot_token)
+    return _bot
 
 
 async def forward_message(
@@ -18,6 +23,8 @@ async def forward_message(
 ) -> str:
     if not user.telegram_chat_id:
         return "permanent_failure"
+
+    bot = _get_bot()
 
     try:
         webpage = getattr(message.media, "webpage", None)
@@ -44,7 +51,7 @@ async def forward_message(
 
         final_message = "\n\n".join(parts)
 
-        await _bot.send_message(
+        await bot.send_message(
             chat_id=user.telegram_chat_id,
             text=final_message,
             parse_mode="HTML",
@@ -64,3 +71,4 @@ async def forward_message(
             f"user_id={user.user_id}: {e}"
             f" and for message: {message.id}"
         )
+        return "transient_failure"

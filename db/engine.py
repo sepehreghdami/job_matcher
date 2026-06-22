@@ -42,14 +42,29 @@ def build_engine(database_url: str):
     return engine
 
 
-# module-level engine and session factory — created once on import
-engine = build_engine(settings.database_url)
-SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+_engine = None
+_SessionLocal = None
+
+
+def get_engine():
+    global _engine, _SessionLocal
+    if _engine is None:
+        _engine = build_engine(settings.database_url)
+        _SessionLocal = sessionmaker(bind=_engine, expire_on_commit=False)
+    return _engine
+
+
+def _get_session_factory():
+    global _SessionLocal
+    if _SessionLocal is None:
+        get_engine()
+    return _SessionLocal
 
 
 @contextmanager
 def get_session():
-    session = SessionLocal()
+    factory = _get_session_factory()
+    session = factory()
     try:
         yield session
     except Exception:

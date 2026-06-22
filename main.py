@@ -1,5 +1,4 @@
-from db.engine import engine  
-from jobs.score_messages import run_evaluate_job 
+from jobs.score_messages import run_evaluate_job
 from jobs.fetch_messages import run_fetch_job
 from jobs.forward_matches import run_forward_job
 import asyncio
