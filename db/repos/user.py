@@ -34,11 +34,11 @@ def batch_save_users(
     
     user_dicts = [u.model_dump(exclude={"created_at"}, exclude_none=True) for u in users]
     
-    stmt = pg_insert(UserDto).values(user_dicts)
+    stmt = pg_insert(User).values(user_dicts)
     
     if on_conflict == "update":
         stmt = stmt.on_conflict_do_update(
-            index_elements=["user_id"],
+            index_elements=["telegram_chat_id"],
             set_={
                 "telegram_username": stmt.excluded.telegram_username,
                 "resume_text": stmt.excluded.resume_text,
@@ -46,7 +46,7 @@ def batch_save_users(
             }
         )
     else:
-        stmt = stmt.on_conflict_do_nothing(index_elements=["user_id"])
+        stmt = stmt.on_conflict_do_nothing(index_elements=["telegram_chat_id"])
     
     result = session.execute(stmt)
     session.commit()
@@ -55,7 +55,7 @@ def batch_save_users(
 
 def get_users(
     session: Session,
-    user_id: Optional[int] = None,
+    user_ids: Optional[List[int]] = None,
     telegram_username: Optional[str] = None,
     is_active: Optional[bool] = None,
     limit: Optional[int] = None
@@ -80,9 +80,9 @@ def get_users(
     """
     query = session.query(User)
     
-    if user_id is not None:
-        query = query.filter(User.user_id == user_id)
-    
+    if user_ids is not None:
+        query = query.filter(User.user_id.in_(user_ids))    
+
     if telegram_username is not None:
         query = query.filter(User.telegram_username == telegram_username)
     

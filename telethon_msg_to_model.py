@@ -13,7 +13,7 @@ from schemas.telegram_message import (
 )
 
 
-def telethon_msg_to_model(msg) -> TelegramMessage:
+def telethon_msg_to_model(msg, channel_username) -> TelegramMessage:
     """
     Convert a Telethon Message object
     into a clean Pydantic TelegramMessage model.
@@ -117,4 +117,5 @@ def telethon_msg_to_model(msg) -> TelegramMessage:
         post_author=getattr(msg, "post_author", None),
         grouped_id=getattr(msg, "grouped_id", None),
         forward=forward,
+        channel_username=channel_username,
     )

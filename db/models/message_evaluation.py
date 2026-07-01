@@ -6,6 +6,7 @@ from sqlalchemy import (
     Index,
     Integer,
     UniqueConstraint,
+    Text,
     func
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -30,7 +31,8 @@ class MessageEvaluation(Base):
     message_pk: Mapped[int] = mapped_column(Integer, ForeignKey("telegram_messages.pk", ondelete="CASCADE"), nullable=False)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     
-    score: Mapped[Optional[float]] = mapped_column(Float)  # 0-10, null if not yet processed
+    score: Mapped[Optional[float]] = mapped_column(Float) 
+    reason: Mapped[Optional[str]] = mapped_column(Text)
     processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))  # null = pending
     forwarded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))  # null = not forwarded yet
     

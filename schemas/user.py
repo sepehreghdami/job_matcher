@@ -1,13 +1,16 @@
-from pydantic import BaseModel,Field
+from pydantic import BaseModel,ConfigDict
 from typing import Optional
 from datetime import datetime
 
+
+
+# schemas/user.py
 class UserDto(BaseModel):
-    user_id: int
+    user_id: Optional[int] = None        # ← add = None
+    telegram_chat_id: Optional[int] = None
     telegram_username: Optional[str] = None
     resume_text: Optional[str] = None
-    created_at: datetime
     is_active: bool = True
-    
-    model_config = {"from_attributes": True}
+    created_at: Optional[datetime] = None  # ← add = None
 
+    model_config = ConfigDict(from_attributes=True)

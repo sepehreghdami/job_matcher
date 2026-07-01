@@ -5,16 +5,12 @@ from sqlalchemy import (
     String,
     Text,
     JSON,
-    create_engine,
     UniqueConstraint,
-    text,
     func
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import  Mapped, mapped_column
 from typing import Optional
 from datetime import datetime
-from urllib.parse import urlparse
 from db.base import Base
 
 
@@ -26,6 +22,7 @@ class TelegramMessageRow(Base):
     )
 
     pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    channel_username: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     message_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     channel_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
