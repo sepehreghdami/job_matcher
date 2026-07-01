@@ -15,7 +15,6 @@ async def main():
 
     scheduler = AsyncIOScheduler()
 
-    # print(settings.fetch_interval_minutes)
     scheduler.add_job(run_fetch_job,"interval", minutes=settings.fetch_interval_minutes)
     scheduler.add_job(run_evaluate_job, "interval", minutes=settings.evaluate_interval_minutes)
     scheduler.add_job(run_forward_job,  "interval", minutes=settings.forward_interval_minutes)
