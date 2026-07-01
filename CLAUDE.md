@@ -9,15 +9,14 @@ Python async service that scrapes Telegram channels for job posts, scores them a
 ## Commands
 
 ```bash
-# Activate the existing virtualenv (Python 3.12, Linux)
-source env-scrapper/bin/activate
-
-# Install/update dependencies
-pip install -r requirements.txt
+# Install/update dependencies (creates/updates .venv from pyproject.toml + uv.lock)
+uv sync
 
 # Run the full service (scheduler + jobs; bot polling optional, see main.py)
-python main.py
+uv run python main.py
 ```
+
+Dependencies are managed with [uv](https://docs.astral.sh/uv/) via `pyproject.toml`/`uv.lock` — do not add to or reintroduce `requirements.txt`. Add a new dependency with `uv add <package>`.
 
 There is no test suite, linter, formatter, or build step configured.
 
