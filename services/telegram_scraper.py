@@ -5,6 +5,7 @@ from datetime import datetime
 from config import settings
 from schemas.telegram_message import TelegramMessage
 from telethon_msg_to_model import telethon_msg_to_model
+from services.proxy import get_telethon_proxy
 
 _client = None
 
@@ -18,6 +19,7 @@ def _get_client() -> TelegramClient:
             settings.telegram_api_hash,
             connection_retries=5,
             retry_delay=3,
+            proxy=get_telethon_proxy(),  # None = direct connection
         )
     return _client
 

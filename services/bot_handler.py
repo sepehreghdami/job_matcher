@@ -6,6 +6,7 @@ from db.engine import get_session
 from db.repos.user import batch_save_users
 from schemas.user import UserDto
 from config import settings
+from services.proxy import get_proxy_url
 
 WAITING_FOR_RESUME = 1  # conversation state
 
@@ -50,7 +51,14 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def build_bot_app() -> Application:
-    app = Application.builder().token(settings.telegram_bot_token).build()
+    builder = Application.builder().token(settings.telegram_bot_token)
+
+    proxy = get_proxy_url()
+    if proxy:
+        # proxy() covers bot API calls; get_updates_proxy() covers long-polling.
+        builder = builder.proxy(proxy).get_updates_proxy(proxy)
+
+    app = builder.build()
 
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],

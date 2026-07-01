@@ -139,7 +139,12 @@ def _to_row(msg: TelegramMessage) -> dict:
 
 
 
-def get_unevaluated_messages(session: Session, user_id: int) -> list[TelegramMessage]:
+def get_unevaluated_messages(
+    session: Session,
+    user_id: int,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+) -> list[TelegramMessage]:
     evaluated = (
         select(MessageEvaluation.message_pk)
         .where(MessageEvaluation.user_id == user_id)
@@ -149,8 +154,14 @@ def get_unevaluated_messages(session: Session, user_id: int) -> list[TelegramMes
     stmt = (
         select(TelegramMessageRow)
         .outerjoin(evaluated, TelegramMessageRow.pk == evaluated.c.message_pk)
-        .where(evaluated.c.message_pk == None) 
+        .where(evaluated.c.message_pk == None)
     )
+
+    if date_from is not None:
+        stmt = stmt.where(TelegramMessageRow.date >= date_from)
+
+    if date_to is not None:
+        stmt = stmt.where(TelegramMessageRow.date <= date_to)
 
     rows = session.scalars(stmt).all()
     return [_from_row(row) for row in rows]

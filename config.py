@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Optional
 
 class Settings(BaseSettings):
     telegram_api_id: int
@@ -8,6 +8,11 @@ class Settings(BaseSettings):
     telegram_bot_token:str
     database_url: str
     telegram_channels: List[str]
+
+    # Optional proxy for Telegram traffic only (Telethon scraper + bot).
+    # The LLM endpoint and Postgres always connect directly. Unset = no proxy.
+    # e.g. a v2ray/xray local SOCKS inbound: socks5://127.0.0.1:10808
+    telegram_proxy_url: Optional[str] = None
 
     fetch_interval_minutes:int
     evaluate_interval_minutes:int

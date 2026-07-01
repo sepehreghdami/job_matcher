@@ -1,5 +1,6 @@
 # jobs/evaluate_job.py
 import asyncio
+from datetime import datetime, timedelta, timezone
 from db.engine import get_session
 from db.repos.user import get_users
 from db.repos.messages import get_unevaluated_messages
@@ -8,9 +9,16 @@ from services.scoring_service import evaluate_messages
 
 
 async def run_evaluate_job():
+    date_from = datetime.now(timezone.utc) - timedelta(days=7)
     with get_session() as session:
         users = get_users(session, is_active=True)
-        tasks = [evaluate_for_user(user, get_unevaluated_messages(session,user_id=user.user_id)) for user in users]
+        tasks = [
+            evaluate_for_user(
+                user,
+                get_unevaluated_messages(session, user_id=user.user_id, date_from=date_from),
+            )
+            for user in users
+        ]
         await asyncio.gather(*tasks)
 
 

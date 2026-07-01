@@ -1,10 +1,12 @@
 
 from telegram import Bot
 from telegram.error import Forbidden, BadRequest
+from telegram.request import HTTPXRequest
 from schemas.evaluation import EvaluationDto
 from schemas.telegram_message import TelegramMessage
 from schemas.user import UserDto
 from config import settings
+from services.proxy import get_proxy_url
 
 _bot = None
 
@@ -12,7 +14,14 @@ _bot = None
 def _get_bot() -> Bot:
     global _bot
     if _bot is None:
-        _bot = Bot(token=settings.telegram_bot_token)
+        proxy = get_proxy_url()
+        if proxy:
+            _bot = Bot(
+                token=settings.telegram_bot_token,
+                request=HTTPXRequest(proxy=proxy),
+            )
+        else:
+            _bot = Bot(token=settings.telegram_bot_token)
     return _bot
 
 
