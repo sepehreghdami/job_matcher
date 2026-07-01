@@ -22,6 +22,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return WAITING_FOR_RESUME
 
 
+async def update_cv(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Send me your new resume — either paste the text or upload it as a PDF — "
+        "and I'll replace the one I have on file."
+    )
+    return WAITING_FOR_RESUME
+
+
 async def _save_resume(update: Update, resume_text: str):
     """Persist the resume and confirm to the user. Ends the conversation."""
     user = update.effective_user
@@ -93,7 +101,10 @@ def build_bot_app() -> Application:
     app = builder.build()
 
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
+        entry_points=[
+            CommandHandler("start", start),
+            CommandHandler("updatecv", update_cv),
+        ],
         states={
             WAITING_FOR_RESUME: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, receive_resume),
