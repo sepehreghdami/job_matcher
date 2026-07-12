@@ -3,21 +3,28 @@
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters, ConversationHandler
 from db.engine import get_session
-from db.repos.user import batch_save_users
+from db.repos.user import batch_save_users, set_user_active
 from schemas.user import UserDto
 from config import settings
 from services.proxy import get_proxy_url
 from services.pdf_service import extract_pdf_text
+from services.docx_service import extract_docx_text
 
 WAITING_FOR_RESUME = 1  # conversation state
 MIN_RESUME_LEN = 50     # shorter than this isn't a usable resume
+
+DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Welcome to Jobular!\n\n"
-        "Send me your resume — either paste the text or upload it as a PDF — "
-        "and I'll start matching job opportunities for you."
+        "Send me your resume — paste the text, or upload it as a PDF or Word (.docx) file — "
+        "and I'll start matching job opportunities for you.\n\n"
+        "Later on you can use:\n"
+        "/updatecv — replace your resume\n"
+        "/unsubscribe — stop receiving matches\n"
+        "/subscribe — turn matches back on"
     )
     return WAITING_FOR_RESUME
 
@@ -53,17 +60,19 @@ async def receive_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return await _save_resume(update, resume_text)
 
 
-async def receive_resume_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def receive_resume_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     document = update.message.document
+    is_pdf = document.mime_type == "application/pdf"
 
     tg_file = await document.get_file()
     data = bytes(await tg_file.download_as_bytearray())
-    resume_text = extract_pdf_text(data)
+    resume_text = extract_pdf_text(data) if is_pdf else extract_docx_text(data)
 
     if len(resume_text) < MIN_RESUME_LEN:
+        kind = "PDF" if is_pdf else "Word file"
         await update.message.reply_text(
-            "❌ I couldn't read any text from that PDF (it may be scanned or image-only). "
-            "Please try another PDF or paste your resume text instead."
+            f"❌ I couldn't read any text from that {kind} (it may be scanned, image-only, or corrupted). "
+            "Please try another file or paste your resume text instead."
         )
         return WAITING_FOR_RESUME  # stay in this state, ask again
 
@@ -72,13 +81,56 @@ async def receive_resume_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def receive_unsupported(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Please paste your resume as text or upload it as a PDF."
+        "Please paste your resume as text, or upload it as a PDF or Word (.docx) file."
     )
     return WAITING_FOR_RESUME  # stay in this state, ask again
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Cancelled. Send /start any time to register.")
+    return ConversationHandler.END
+
+
+async def updatecv(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Send me your new resume — paste the text, or upload it as a PDF or Word (.docx) file — "
+        "and I'll replace your current one."
+    )
+    return WAITING_FOR_RESUME
+
+
+async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    with get_session() as session:
+        updated = set_user_active(user.id, is_active=False, session=session)
+
+    if updated:
+        await update.message.reply_text(
+            "🛑 You've been unsubscribed. I won't send you any more job matches. "
+            "Send /subscribe any time to turn matches back on."
+        )
+    else:
+        await update.message.reply_text(
+            "You're not registered yet, so there's nothing to unsubscribe from. "
+            "Send /start to sign up."
+        )
+    return ConversationHandler.END
+
+
+async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Re-activate an existing (currently inactive) user. New users should use /start."""
+    user = update.effective_user
+    with get_session() as session:
+        updated = set_user_active(user.id, is_active=True, session=session)
+
+    if updated:
+        await update.message.reply_text(
+            "✅ You're subscribed again! I'll notify you when I find job postings that match your profile."
+        )
+    else:
+        await update.message.reply_text(
+            "You're not registered yet. Send /start to sign up with your resume."
+        )
     return ConversationHandler.END
 
 
@@ -93,16 +145,29 @@ def build_bot_app() -> Application:
     app = builder.build()
 
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
+        entry_points=[
+            CommandHandler("start", start),
+            CommandHandler("updatecv", updatecv),
+            CommandHandler("unsubscribe", unsubscribe),
+            CommandHandler("subscribe", subscribe),
+        ],
         states={
             WAITING_FOR_RESUME: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, receive_resume),
-                MessageHandler(filters.Document.PDF, receive_resume_pdf),
+                MessageHandler(
+                    filters.Document.PDF | filters.Document.MimeType(DOCX_MIME),
+                    receive_resume_file,
+                ),
                 # Anything else (images, other docs, stickers…) — nudge back on track.
                 MessageHandler(~filters.COMMAND, receive_unsupported),
             ],
         },
-        fallbacks=[CommandHandler("cancel", cancel)],
+        fallbacks=[
+            CommandHandler("cancel", cancel),
+            CommandHandler("updatecv", updatecv),
+            CommandHandler("unsubscribe", unsubscribe),
+            CommandHandler("subscribe", subscribe),
+        ],
     )
 
     app.add_handler(conv_handler)

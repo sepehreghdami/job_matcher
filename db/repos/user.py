@@ -1,4 +1,5 @@
 from schemas.user import UserDto
+from sqlalchemy import update
 from sqlalchemy.orm import  Session
 from typing import Optional, List
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -94,4 +95,24 @@ def get_users(
     
     rows = query.all()
     return [UserDto.model_validate(row) for row in rows]
+
+
+def set_user_active(
+    telegram_chat_id: int,
+    is_active: bool,
+    session: Session,
+) -> bool:
+    """
+    Flip a user's active flag by telegram_chat_id (used for /unsubscribe).
+
+    Returns True if a row was updated, False if no user with that chat id exists.
+    """
+    stmt = (
+        update(User)
+        .where(User.telegram_chat_id == telegram_chat_id)
+        .values(is_active=is_active)
+    )
+    result = session.execute(stmt)
+    session.commit()
+    return result.rowcount > 0
 
