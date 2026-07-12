@@ -1,6 +1,7 @@
 # services/scoring.py
 
 import asyncio
+import logging
 from typing import List, Tuple
 from pydantic import BaseModel
 from agents import Agent, Runner
@@ -15,6 +16,8 @@ from services.scoring_constants import SCORING_INSTRUCTIONS
 import agents
 
 agents.set_tracing_disabled(True)
+
+logger = logging.getLogger(__name__)
 
 
 class MessageScore(BaseModel):
@@ -60,6 +63,7 @@ _agent = None
 def _ensure_initialized():
     global _client, _agent
     if _client is None:
+        logger.info("Initializing LLM client (model=%s, base_url=%s)", settings.scoring_model, settings.llm_base_url)
         _client = AsyncOpenAI(
             api_key=settings.llm_api_key,
             base_url=settings.llm_base_url,
@@ -80,6 +84,7 @@ async def _score_batch(
 
     _ensure_initialized()
 
+    logger.debug("Scoring batch of %d messages for user=%s", len(batch), user.user_id)
     prompt, index_to_pk = _build_user_prompt(resume=user.resume_text, messages=batch)
     result = await Runner.run(_agent, prompt)
     scored: ScoringResult = result.final_output
@@ -90,14 +95,14 @@ async def _score_batch(
     missing = sent_indices - returned_indices
 
     if missing:
-        print(f"[scoring] user={user.user_id} — LLM dropped indices {missing}")
+        logger.warning("[scoring] user=%s — LLM dropped indices %s", user.user_id, missing)
 
     evals = []
     for s in scored.scores:
         real_pk = index_to_pk.get(s.message_pk)      # [1] → actual DB pk
 
         if real_pk is None:
-            print(f"[scoring] user={user.user_id} — unknown index {s.message_pk}, skipping")
+            logger.warning("[scoring] user=%s — unknown index %s, skipping", user.user_id, s.message_pk)
             continue
 
         evals.append(EvaluationDto(
@@ -108,6 +113,10 @@ async def _score_batch(
             processed_at=now,
         ))
 
+    logger.info(
+        "[scoring] user=%s batch scored: %d messages -> %d evaluations",
+        user.user_id, len(batch), len(evals),
+    )
     return evals
 
 
@@ -121,6 +130,11 @@ async def evaluate_messages(
     batch_size = settings.scoring_batch_size
     batches = [messages[i: i + batch_size] for i in range(0, len(messages), batch_size)]
 
+    logger.info(
+        "[scoring] user=%s evaluating %d messages in %d batches (batch_size=%d, max_concurrent=%d)",
+        user.user_id, len(messages), len(batches), batch_size, settings.scoring_max_concurrent,
+    )
+
     sem = asyncio.Semaphore(settings.scoring_max_concurrent)
 
     async def _guarded(batch):
@@ -130,9 +144,16 @@ async def evaluate_messages(
     results = await asyncio.gather(*[_guarded(b) for b in batches], return_exceptions=True)
 
     flat: List[EvaluationDto] = []
+    failed_batches = 0
     for i, res in enumerate(results):
         if isinstance(res, Exception):
-            print(f"[scoring] user={user.user_id} batch={i} failed: {res}")
+            failed_batches += 1
+            logger.error("[scoring] user=%s batch=%d failed: %s", user.user_id, i, res)
         else:
             flat.extend(res)
+
+    logger.info(
+        "[scoring] user=%s report: %d/%d batches ok, %d evaluations produced",
+        user.user_id, len(batches) - failed_batches, len(batches), len(flat),
+    )
     return flat

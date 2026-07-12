@@ -8,9 +8,12 @@ rare file MuPDF can't open.
 """
 
 import io
+import logging
 
 import fitz  # PyMuPDF
 from pypdf import PdfReader
+
+logger = logging.getLogger(__name__)
 
 
 def _extract_with_fitz(data: bytes) -> str:
@@ -37,12 +40,15 @@ def extract_pdf_text(data: bytes) -> str:
     try:
         text = _extract_with_fitz(data)
         if text:
+            logger.debug("[pdf] extracted %d chars via fitz", len(text))
             return text
     except Exception as e:
-        print(f"[pdf] fitz extraction failed: {type(e).__name__}: {e}")
+        logger.warning("[pdf] fitz extraction failed: %s: %s", type(e).__name__, e)
 
     try:
-        return _extract_with_pypdf(data)
+        text = _extract_with_pypdf(data)
+        logger.debug("[pdf] extracted %d chars via pypdf fallback", len(text))
+        return text
     except Exception as e:
-        print(f"[pdf] pypdf extraction failed: {type(e).__name__}: {e}")
+        logger.error("[pdf] pypdf extraction failed: %s: %s", type(e).__name__, e)
         return ""

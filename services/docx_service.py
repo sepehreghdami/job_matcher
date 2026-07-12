@@ -2,8 +2,11 @@
 """Extract plain text from a .docx file's raw bytes."""
 
 import io
+import logging
 
 from docx import Document
+
+logger = logging.getLogger(__name__)
 
 
 def extract_docx_text(data: bytes) -> str:
@@ -22,7 +25,9 @@ def extract_docx_text(data: bytes) -> str:
                 for cell in row.cells:
                     parts.append(cell.text)
     except Exception as e:
-        print(f"[docx] extraction failed: {type(e).__name__}: {e}")
+        logger.error("[docx] extraction failed: %s: %s", type(e).__name__, e)
         return ""
 
-    return "\n".join(p for p in parts if p.strip()).strip()
+    text = "\n".join(p for p in parts if p.strip()).strip()
+    logger.debug("[docx] extracted %d chars", len(text))
+    return text

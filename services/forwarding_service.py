@@ -1,4 +1,5 @@
 
+import logging
 from telegram import Bot
 from telegram.error import Forbidden, BadRequest
 from telegram.request import HTTPXRequest
@@ -8,6 +9,8 @@ from schemas.user import UserDto
 from config import settings
 from services.proxy import get_proxy_url
 
+logger = logging.getLogger(__name__)
+
 _bot = None
 
 
@@ -15,6 +18,7 @@ def _get_bot() -> Bot:
     global _bot
     if _bot is None:
         proxy = get_proxy_url()
+        logger.info("Creating forwarding Bot client (proxy=%s)", "enabled" if proxy else "direct")
         if proxy:
             _bot = Bot(
                 token=settings.telegram_bot_token,
@@ -67,17 +71,19 @@ async def forward_message(
             disable_web_page_preview=False,
         )
 
+        logger.debug("[forward] sent message pk=%s to user_id=%s", message.pk, user.user_id)
         return "ok"
 
     except (Forbidden, BadRequest) as e:
-        print(f"[forward] permanent failure for user_id={user.user_id}: {e} and for message: {message.id}")
+        logger.error(
+            "[forward] permanent failure for user_id=%s, message=%s: %s",
+            user.user_id, message.id, e,
+        )
         return "permanent_failure"
 
     except Exception as e:
-        print(
-            f"[forward] transient failure "
-            f"type={type(e).__name__} "
-            f"user_id={user.user_id}: {e}"
-            f" and for message: {message.id}"
+        logger.warning(
+            "[forward] transient failure type=%s user_id=%s message=%s: %s",
+            type(e).__name__, user.user_id, message.id, e,
         )
         return "transient_failure"

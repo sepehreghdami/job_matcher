@@ -4,3 +4,4 @@ session_name.session
 testvenv
 env-scrapper
 scraper_env
+logs/
