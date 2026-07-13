@@ -7,6 +7,7 @@ setup_logging()
 from jobs.score_messages import run_evaluate_job
 from jobs.fetch_messages import run_fetch_job
 from jobs.forward_matches import run_forward_job
+from jobs.extract_keywords import run_keyword_extraction_job
 import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
@@ -36,6 +37,7 @@ async def main():
     scheduler = AsyncIOScheduler()
 
     scheduler.add_job(run_fetch_job, "interval", minutes=settings.fetch_interval_minutes, id="fetch")
+    scheduler.add_job(run_keyword_extraction_job, "interval", minutes=settings.keyword_extraction_interval_minutes, id="keyword_extraction")
     scheduler.add_job(run_evaluate_job, "interval", minutes=settings.evaluate_interval_minutes, id="evaluate")
     scheduler.add_job(run_forward_job, "interval", minutes=settings.forward_interval_minutes, id="forward")
 
@@ -43,14 +45,15 @@ async def main():
 
     scheduler.start()
     logger.info(
-        "Scheduler started (fetch=%dmin, evaluate=%dmin, forward=%dmin)",
+        "Scheduler started (fetch=%dmin, keyword_extraction=%dmin, evaluate=%dmin, forward=%dmin)",
         settings.fetch_interval_minutes,
+        settings.keyword_extraction_interval_minutes,
         settings.evaluate_interval_minutes,
         settings.forward_interval_minutes,
     )
 
-    logger.info("Running fetch, evaluate, forward once on startup")
-    await asyncio.gather(run_fetch_job(), run_evaluate_job(), run_forward_job())
+    logger.info("Running fetch, keyword extraction, evaluate, forward once on startup")
+    await asyncio.gather(run_fetch_job(), run_keyword_extraction_job(), run_evaluate_job(), run_forward_job())
 
     logger.info("Startup jobs complete — service is now running on schedule")
     await asyncio.Event().wait()  # keep alive

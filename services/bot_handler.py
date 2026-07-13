@@ -10,6 +10,7 @@ from config import settings
 from services.proxy import get_proxy_url
 from services.pdf_service import extract_pdf_text
 from services.docx_service import extract_docx_text
+from services.keyword_service import extract_keywords
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def _save_resume(update: Update, resume_text: str):
     """Persist the resume and confirm to the user. Ends the conversation."""
     user = update.effective_user
+
+    try:
+        keywords = await extract_keywords(resume_text)
+    except Exception as e:
+        logger.warning("[bot] keyword extraction failed for user_id=%s: %s", user.id, e)
+        keywords = []
+
     with get_session() as session:
         batch_save_users(
             [UserDto(
@@ -43,12 +51,13 @@ async def _save_resume(update: Update, resume_text: str):
                 telegram_username=user.username,
                 resume_text=resume_text,
                 is_active=True,
+                keywords=keywords or None,
             )],
             session,
             on_conflict="update",
         )
 
-    logger.info("[bot] resume saved for user_id=%s (%d chars)", user.id, len(resume_text))
+    logger.info("[bot] resume saved for user_id=%s (%d chars, %d keywords)", user.id, len(resume_text), len(keywords))
     await update.message.reply_text(
         "✅ You're all set! I'll notify you when I find job postings that match your profile."
     )

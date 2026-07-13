@@ -7,6 +7,8 @@ from db.repos.user import get_users
 from db.repos.messages import get_unevaluated_messages
 from db.repos.evaluations import batch_save_evaluations
 from services.scoring_service import evaluate_messages
+from services.keyword_matcher import filter_messages_by_keywords
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -16,18 +18,35 @@ async def run_evaluate_job():
 
     date_from = datetime.now(timezone.utc) - timedelta(days=7)
     with get_session() as session:
-        users = get_users(session, is_active=True)
+        # Only users with extracted keywords are considered — users without
+        # them yet (new signups whose extraction failed, or legacy users) are
+        # picked up by jobs/extract_keywords.py and included on a later cycle.
+        users = get_users(session, is_active=True, has_keywords=True)
         user_messages = {
             user.user_id: get_unevaluated_messages(session, user_id=user.user_id, date_from=date_from)
             for user in users
         }
 
+    total_before = sum(len(m) for m in user_messages.values())
+
+    filtered_user_messages = {}
+    for user in users:
+        messages = user_messages[user.user_id]
+        kept = filter_messages_by_keywords(messages, user.keywords, settings.keyword_match_min_count)
+        logger.info(
+            "[evaluate_job] user=%s: keyword-filtered %d -> %d messages (min_count=%d, %d keywords)",
+            user.user_id, len(messages), len(kept), settings.keyword_match_min_count, len(user.keywords),
+        )
+        filtered_user_messages[user.user_id] = kept
+
+    total_after = sum(len(m) for m in filtered_user_messages.values())
     logger.info(
-        "[evaluate_job] evaluating %d active users, %d unevaluated messages total",
-        len(users), sum(len(m) for m in user_messages.values()),
+        "[evaluate_job] evaluating %d users, %d/%d unevaluated messages after keyword filter (%.0f%% reduction)",
+        len(users), total_after, total_before,
+        (100.0 * (total_before - total_after) / total_before) if total_before else 0.0,
     )
 
-    tasks = [evaluate_for_user(user, user_messages[user.user_id]) for user in users]
+    tasks = [evaluate_for_user(user, filtered_user_messages[user.user_id]) for user in users]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     saved_total = 0

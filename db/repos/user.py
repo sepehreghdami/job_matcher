@@ -44,6 +44,7 @@ def batch_save_users(
                 "telegram_username": stmt.excluded.telegram_username,
                 "resume_text": stmt.excluded.resume_text,
                 "is_active": stmt.excluded.is_active,
+                "keywords": stmt.excluded.keywords,
             }
         )
     else:
@@ -59,40 +60,49 @@ def get_users(
     user_ids: Optional[List[int]] = None,
     telegram_username: Optional[str] = None,
     is_active: Optional[bool] = None,
+    has_keywords: Optional[bool] = None,
     limit: Optional[int] = None
 ) -> List[UserDto]:
     """
     Get users with optional filters.
-    
+
     Args:
         session: SQLAlchemy session
         user_id: Filter by specific user_id
         telegram_username: Filter by telegram username
         is_active: Filter by active status (True/False/None for all)
+        has_keywords: Filter by whether resume keywords have been extracted
+            (True/False/None for all)
         limit: Maximum number of results
-    
+
     Returns:
         List of UserSchema objects
-    
+
     Examples:
         get_users(session)  # all users
         get_users(session, is_active=True)  # only active users
         get_users(session, user_id=123)  # specific user
+        get_users(session, is_active=True, has_keywords=False)  # need backfill
     """
     query = session.query(User)
-    
+
     if user_ids is not None:
-        query = query.filter(User.user_id.in_(user_ids))    
+        query = query.filter(User.user_id.in_(user_ids))
 
     if telegram_username is not None:
         query = query.filter(User.telegram_username == telegram_username)
-    
+
     if is_active is not None:
         query = query.filter(User.is_active == is_active)
-    
+
+    if has_keywords is True:
+        query = query.filter(User.keywords.isnot(None))
+    elif has_keywords is False:
+        query = query.filter(User.keywords.is_(None))
+
     if limit is not None:
         query = query.limit(limit)
-    
+
     rows = query.all()
     return [UserDto.model_validate(row) for row in rows]
 

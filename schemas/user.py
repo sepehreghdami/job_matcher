@@ -1,5 +1,5 @@
 from pydantic import BaseModel,ConfigDict
-from typing import Optional
+from typing import List, Optional
 from datetime import datetime
 
 
@@ -10,6 +10,7 @@ class UserDto(BaseModel):
     telegram_chat_id: Optional[int] = None
     telegram_username: Optional[str] = None
     resume_text: Optional[str] = None
+    keywords: Optional[List[str]] = None
     is_active: bool = True
     created_at: Optional[datetime] = None  # ← add = None
 

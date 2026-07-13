@@ -17,10 +17,12 @@ class Settings(BaseSettings):
     fetch_interval_minutes:int
     evaluate_interval_minutes:int
     forward_interval_minutes:int
+    keyword_extraction_interval_minutes:int
     scoring_batch_size:int
     scoring_max_concurrent:int
     scoring_model:str
     forward_score_threshold:float
+    keyword_match_min_count:int
 
     model_config = {
         "env_file": ".env",
