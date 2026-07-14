@@ -27,32 +27,51 @@ KEYWORD_EXTRACTION_INSTRUCTIONS = """
 You are a technical recruiter extracting search keywords from a candidate's resume.
 
 Your task:
-Given a resume, extract 8 to 15 concise keywords that best represent the
-candidate's expertise, so they can be used to filter relevant job postings
-by simple text matching (not semantic search) — so exact wording matters.
+Given a resume, extract a broad, generous set of keywords (typically 20 to 40 —
+more than you might think necessary) that represent the candidate's expertise,
+so they can be used to filter relevant job postings by simple literal text
+matching (not semantic search) — exact wording matters, so cast a wide net
+rather than a narrow, minimal one. Many real job postings are short teasers
+(just a title, with the actual tech stack never mentioned), so title-level
+keywords matter as much as tool-level ones.
 
-Rules:
-- Focus on: technical skills, tools/frameworks/languages, domain/methodology
-  terms, and the candidate's core discipline, actually present in the resume.
-- STRONGLY PREFER single-word, atomic keywords (e.g. "frontend", "react",
-  "kubernetes", "backend") over multi-word phrases. Job postings word things
-  in wildly different ways ("Frontend Developer", "Front-End Engineer",
-  "Front End Dev"), and a rigid multi-word phrase will fail to match most of
-  those variants, while the single core word ("frontend") matches all of them.
-- NEVER combine a skill/discipline with a generic role suffix like
-  "developer", "engineer", "architect", or "specialist" into one keyword
-  (e.g. do NOT output "frontend developer" or "backend engineer" — output
-  "frontend" / "backend" alone instead). These role suffixes add no
-  filtering value and make the keyword brittle to wording differences.
-- Multi-word keywords are only acceptable for established, genuinely fixed
-  technical/methodology terms where splitting them would lose meaning
-  (e.g. "machine learning", "clean architecture", "domain-driven design",
-  "event-driven systems") — not for role titles.
+There are two layers of keywords to produce. Include BOTH, generously:
+
+1) ATOMIC SKILL/TOOL KEYWORDS
+   - Technical skills, tools/frameworks/languages, and domain/methodology
+     terms actually present in the resume.
+   - STRONGLY PREFER single-word, atomic keywords (e.g. "frontend", "react",
+     "kubernetes", "backend") over multi-word phrases — job postings word
+     things in wildly different ways, and a rigid multi-word phrase will
+     fail to match most variants, while the single core word matches all of
+     them.
+   - Multi-word phrases are only OK for established, genuinely fixed
+     technical/methodology terms where splitting them would lose meaning
+     (e.g. "machine learning", "clean architecture", "domain-driven design").
+   - Avoid single, overly generic keywords that could match unrelated text
+     (e.g. prefer "golang" over a bare "go").
+
+2) ROLE-TITLE KEYWORDS — generate MULTIPLE phrasings, generously
+   - Unlike the atomic layer, DO include role-title phrases here (e.g.
+     "backend developer", "backend engineer") — these exist specifically to
+     catch postings that only show a bare title with no visible tech stack.
+   - For the candidate's core discipline(s), generate several different
+     common ways recruiters phrase that role, even if the resume itself only
+     uses one wording. Example: a backend-focused candidate should get
+     "backend developer", "backend engineer", "back end developer",
+     "back end engineer" — cover both "developer" and "engineer" endings,
+     and both the merged ("backend") and spaced ("back end") spelling.
+   - ALSO include broader, more general titles that would still genuinely
+     apply to this candidate, even if less specific — e.g. a web/frontend/
+     backend developer should also get "software engineer" and "software
+     developer", since many relevant postings use only that generic title.
+   - Only generate role-title variants that are true to the candidate's
+     actual discipline(s) — don't invent unrelated roles.
+
+Other rules:
 - Return keywords in lowercase.
 - Do not invent skills not mentioned in the resume.
 - Do not include generic filler words (e.g. "experience", "team", "work",
   "senior", "junior").
-- Avoid single, overly generic keywords that could match unrelated text
-  (e.g. prefer "golang" over a bare "go").
 - No duplicates, no explanations — only the keyword list.
 """

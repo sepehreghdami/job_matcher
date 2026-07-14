@@ -13,7 +13,11 @@ def _make_pattern(keyword: str) -> re.Pattern:
     # immediately outside the keyword to not be alphanumeric, regardless of
     # the keyword's own edge characters — still blocks "go" from matching
     # inside "going"/"google".
-    return re.compile(rf"(?<![A-Za-z0-9_]){re.escape(keyword)}(?![A-Za-z0-9_])", re.IGNORECASE)
+    #
+    # (?:es|s)? tolerates a trailing English plural ("engineer" also matches
+    # "engineers", "developer" also matches "developers") without needing the
+    # keyword generator to enumerate singular/plural pairs explicitly.
+    return re.compile(rf"(?<![A-Za-z0-9_]){re.escape(keyword)}(?:es|s)?(?![A-Za-z0-9_])", re.IGNORECASE)
 
 
 def _compile_patterns(keywords: List[str]) -> List[List[re.Pattern]]:

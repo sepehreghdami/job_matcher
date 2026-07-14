@@ -76,8 +76,12 @@ def _load_or_create_manifest(days: int, batch_size: int) -> dict:
     batches = [message_pks[i:i + batch_size] for i in range(0, len(message_pks), batch_size)]
 
     manifest = {"days": days, "batch_size": batch_size, "message_pks": message_pks, "batches": batches}
-    with open(MANIFEST_PATH, "w") as f:
+    # Write to a temp file then rename — rename is atomic, so a crash mid-write
+    # can never leave a half-written, unparseable manifest on disk.
+    tmp_path = MANIFEST_PATH + ".tmp"
+    with open(tmp_path, "w") as f:
         json.dump(manifest, f)
+    os.replace(tmp_path, MANIFEST_PATH)
     logger.info("[experiment] created new manifest: %d messages, %d batches", len(message_pks), len(batches))
     return manifest
 
@@ -88,18 +92,50 @@ def _load_completed() -> set:
     if not os.path.exists(CHECKPOINT_PATH):
         return completed
     with open(CHECKPOINT_PATH) as f:
-        for line in f:
+        for line_num, line in enumerate(f, start=1):
             line = line.strip()
             if not line:
                 continue
-            rec = json.loads(line)
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                # Only expected on the last line, if the process was hard-killed
+                # mid-write (e.g. power loss, SIGKILL) — that batch simply
+                # wasn't checkpointed and will be retried below, no data lost.
+                logger.warning(
+                    "[experiment] skipping unparseable checkpoint line %d (likely a partial write from a hard interrupt)",
+                    line_num,
+                )
+                continue
             if rec["ok"]:
                 completed.add((rec["chat_id"], rec["batch_index"]))
     return completed
 
 
-async def _score_batch_with_retry(user: UserDto, batch_index: int, batch_msgs: list, sem: asyncio.Semaphore) -> dict:
+class QuotaExhausted(Exception):
+    """Raised when the LLM gateway reports the account is out of funds — not
+    worth retrying, and not worth attempting any further batches this run."""
+
+
+def _is_quota_error(e: Exception) -> bool:
+    msg = str(e).lower()
+    return "insufficient_user_quota" in msg or "insufficient user quota" in msg
+
+
+async def _score_batch_with_retry(
+    user: UserDto, batch_index: int, batch_msgs: list, sem: asyncio.Semaphore, stop_flag: dict,
+) -> dict:
+    if stop_flag["hit"]:
+        # Quota already confirmed exhausted by another task — don't even try,
+        # just record as not-done (not a real failure) so it's retried, not
+        # skipped, next time. Keeps a dead account from burning through
+        # hundreds of doomed retries one batch at a time.
+        return {"chat_id": user.telegram_chat_id, "batch_index": batch_index, "ok": False, "skipped": True}
+
     async with sem:
+        if stop_flag["hit"]:
+            return {"chat_id": user.telegram_chat_id, "batch_index": batch_index, "ok": False, "skipped": True}
+
         last_error = None
         for attempt in range(RETRY_ATTEMPTS):
             try:
@@ -112,6 +148,13 @@ async def _score_batch_with_retry(user: UserDto, batch_index: int, batch_msgs: l
                 }
             except Exception as e:
                 last_error = e
+                if _is_quota_error(e):
+                    logger.error(
+                        "[experiment] LLM quota exhausted — stopping new batches (top up and rerun to resume). "
+                        "First seen on user=%s batch=%d", user.telegram_chat_id, batch_index,
+                    )
+                    stop_flag["hit"] = True
+                    break  # no point retrying a dead quota
                 if attempt < RETRY_ATTEMPTS - 1:
                     wait = RETRY_BACKOFF_SECONDS[attempt]
                     logger.warning(
@@ -179,9 +222,16 @@ async def main():
 
     sem = asyncio.Semaphore(args.concurrency)
     write_lock = asyncio.Lock()
+    stop_flag = {"hit": False}
 
     async def _run_and_checkpoint(user, batch_index, batch_msgs):
-        result = await _score_batch_with_retry(user, batch_index, batch_msgs, sem)
+        result = await _score_batch_with_retry(user, batch_index, batch_msgs, sem, stop_flag)
+        if result.get("skipped"):
+            # Quota was already known-dead when this task got its turn — don't
+            # even write a "failed" record; leaving it absent from the
+            # checkpoint means it's picked up fresh (not retried-and-failed)
+            # next run, and keeps the file from bloating with dead entries.
+            return False
         async with write_lock:
             with open(CHECKPOINT_PATH, "a") as f:
                 f.write(json.dumps(result) + "\n")
@@ -197,6 +247,8 @@ async def main():
         "[experiment] batch of work done in %.1fs (%.1f min): %d/%d ok this run",
         elapsed, elapsed / 60, ok_count, len(todo),
     )
+    if stop_flag["hit"]:
+        logger.warning("[experiment] stopped early — LLM quota was exhausted. Top up and rerun the same command to resume.")
 
     total_completed = len(_load_completed())
     total_needed = len(users) * len(batches)
